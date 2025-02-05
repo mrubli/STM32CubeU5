@@ -19,6 +19,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include <stdio.h>
 
 /** @addtogroup STM32U5xx_HAL_Examples
   * @{
@@ -49,6 +50,11 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi);
 HAL_StatusTypeDef OSPIClock_Config(void);
 
 /* Private functions ---------------------------------------------------------*/
+
+int __io_putchar(int ch)
+{
+  return ITM_SendChar(ch);
+}
 
 /**
   * @brief  Main program
@@ -139,6 +145,7 @@ int main(void)
       sCommand.Address       = address;
       sCommand.DataMode      = HAL_XSPI_DATA_NONE;
       sCommand.DummyCycles   = 0;
+      printf("erasing %p (sector)\n", mem_addr);
 
       if (HAL_XSPI_Command_IT(&OSPIHandle, &sCommand) != HAL_OK)
       {
@@ -190,6 +197,7 @@ int main(void)
 
         /* Writing Sequence ----------------------------------------------- */
         mem_addr = (uint8_t *)(OCTOSPI1_BASE + address);
+        printf("writing %p (%u bytes)\n", mem_addr, BUFFERSIZE);
         for (index = 0; index < BUFFERSIZE; index++)
         {
           *mem_addr = aTxBuffer[index];
@@ -203,6 +211,7 @@ int main(void)
 
         /* Reading Sequence ----------------------------------------------- */
         mem_addr = (uint8_t *)(OCTOSPI1_BASE + address);
+        printf("reading %p (%u bytes)\n", mem_addr, BUFFERSIZE);
         for (index = 0; index < BUFFERSIZE ; index++)
         {
           if (*mem_addr != aTxBuffer[index])
