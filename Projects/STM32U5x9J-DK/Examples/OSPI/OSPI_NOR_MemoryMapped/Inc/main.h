@@ -83,13 +83,17 @@
 #define OCTAL_READ_STATUS_REG_CMD   0x05FA
 #define OCTAL_SECTOR_ERASE_CMD      0x21DE
 #define OCTAL_WRITE_ENABLE_CMD      0x06F9
+#define OCTAL_WRITE_CFG_REG_2_CMD   0x728D
 #define READ_STATUS_REG_CMD         0x05
 #define WRITE_CFG_REG_2_CMD         0x72
 #define WRITE_ENABLE_CMD            0x06
 
 /* Dummy clocks cycles */
-#define DUMMY_CLOCK_CYCLES_READ     6
-#define DUMMY_CLOCK_CYCLES_READ_REG 4
+//#define DUMMY_CLOCK_CYCLES_READ     6
+//#define DUMMY_CLOCK_CYCLES_READ_REG 4
+
+#define DUMMY_CLOCK_CYCLES_READ_DTR     6
+#define DUMMY_CLOCK_CYCLES_READ_REG_DTR 5
 
 /* Auto-polling values */
 #define WRITE_ENABLE_MATCH_VALUE    0x02
