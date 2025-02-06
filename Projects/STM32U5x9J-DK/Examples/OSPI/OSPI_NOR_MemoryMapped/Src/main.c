@@ -230,7 +230,7 @@ int main(void)
   HAL_XSPI_DeInit(&OSPIHandle);
 
   OSPIHandle.Init.FifoThresholdByte         = 4;
-  OSPIHandle.Init.MemoryType                = HAL_XSPI_MEMTYPE_MICRON;
+  OSPIHandle.Init.MemoryType                = HAL_XSPI_MEMTYPE_MACRONIX;
   OSPIHandle.Init.MemorySize                = HAL_XSPI_SIZE_512MB;
   OSPIHandle.Init.ChipSelectHighTimeCycle   = 2;
   OSPIHandle.Init.FreeRunningClock          = HAL_XSPI_FREERUNCLK_DISABLE;
@@ -564,9 +564,9 @@ static void OSPI_WriteEnable(XSPI_HandleTypeDef *hospi)
   sCommand.Instruction        = OCTAL_WRITE_ENABLE_CMD;
   sCommand.InstructionMode    = HAL_XSPI_INSTRUCTION_8_LINES;
   sCommand.InstructionWidth   = HAL_XSPI_INSTRUCTION_16_BITS;
-  sCommand.InstructionDTRMode = HAL_XSPI_INSTRUCTION_DTR_DISABLE;
+  sCommand.InstructionDTRMode = HAL_XSPI_INSTRUCTION_DTR_ENABLE;
   sCommand.AddressMode        = HAL_XSPI_ADDRESS_NONE;
-  sCommand.AlternateBytesMode = HAL_XSPI_BONDARYOF_NONE;
+  sCommand.AlternateBytesMode = HAL_XSPI_ALT_BYTES_NONE;
   sCommand.DataMode           = HAL_XSPI_DATA_NONE;
   sCommand.DummyCycles        = 0;
   sCommand.DQSMode            = HAL_XSPI_DQS_DISABLE;
@@ -582,16 +582,16 @@ static void OSPI_WriteEnable(XSPI_HandleTypeDef *hospi)
   sCommand.Address        = 0x0;
   sCommand.AddressMode    = HAL_XSPI_ADDRESS_8_LINES;
   sCommand.AddressWidth   = HAL_XSPI_ADDRESS_32_BITS;
-  sCommand.AddressDTRMode = HAL_XSPI_ADDRESS_DTR_DISABLE;
+  sCommand.AddressDTRMode = HAL_XSPI_ADDRESS_DTR_ENABLE;
   sCommand.DataMode       = HAL_XSPI_DATA_8_LINES;
-  sCommand.DataDTRMode    = HAL_XSPI_DATA_DTR_DISABLE;
-  sCommand.DataLength     = 1;
+  sCommand.DataDTRMode    = HAL_XSPI_DATA_DTR_ENABLE;
+  sCommand.DataLength     = 2;
   sCommand.DummyCycles    = DUMMY_CLOCK_CYCLES_READ_REG_DTR;
 
-    if (HAL_XSPI_Command(hospi, &sCommand, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
-    {
-      Error_Handler();
-    }
+  if (HAL_XSPI_Command(hospi, &sCommand, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+  {
+    Error_Handler();
+  }
 
   sConfig.MatchValue      = WRITE_ENABLE_MATCH_VALUE;
   sConfig.MatchMask       = WRITE_ENABLE_MASK_VALUE;
@@ -600,9 +600,9 @@ static void OSPI_WriteEnable(XSPI_HandleTypeDef *hospi)
   sConfig.AutomaticStop   = HAL_XSPI_AUTOMATIC_STOP_ENABLE;
 
   if (HAL_XSPI_AutoPolling(hospi, &sConfig, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
-    {
-      Error_Handler();
-    }
+  {
+    Error_Handler();
+  }
 }
 
 /**
@@ -620,17 +620,17 @@ static void OSPI_AutoPollingMemReady(XSPI_HandleTypeDef *hospi)
   sCommand.Instruction        = OCTAL_READ_STATUS_REG_CMD;
   sCommand.InstructionMode    = HAL_XSPI_INSTRUCTION_8_LINES;
   sCommand.InstructionWidth   = HAL_XSPI_INSTRUCTION_16_BITS;
-  sCommand.InstructionDTRMode = HAL_XSPI_INSTRUCTION_DTR_DISABLE;
+  sCommand.InstructionDTRMode = HAL_XSPI_INSTRUCTION_DTR_ENABLE;
   sCommand.Address            = 0x0;
   sCommand.AddressMode        = HAL_XSPI_ADDRESS_8_LINES;
   sCommand.AddressWidth       = HAL_XSPI_ADDRESS_32_BITS;
-  sCommand.AddressDTRMode     = HAL_XSPI_ADDRESS_DTR_DISABLE;
+  sCommand.AddressDTRMode     = HAL_XSPI_ADDRESS_DTR_ENABLE;
   sCommand.AlternateBytesMode = HAL_XSPI_ALT_BYTES_NONE;
   sCommand.DataMode           = HAL_XSPI_DATA_8_LINES;
   sCommand.DataDTRMode        = HAL_XSPI_DATA_DTR_DISABLE;
-  sCommand.DataLength         = 1;
+  sCommand.DataLength         = 2;
   sCommand.DummyCycles        = DUMMY_CLOCK_CYCLES_READ_REG_DTR;
-  sCommand.DQSMode            = HAL_XSPI_DQS_DISABLE;
+  sCommand.DQSMode            = HAL_XSPI_DQS_ENABLE;
   sCommand.SIOOMode           = HAL_XSPI_SIOO_INST_EVERY_CMD;
 
   if (HAL_XSPI_Command(hospi, &sCommand, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
@@ -671,7 +671,7 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
   sCommand.AlternateBytesMode = HAL_XSPI_ALT_BYTES_NONE;
   sCommand.DataMode           = HAL_XSPI_DATA_NONE;
   sCommand.DummyCycles        = 0;
-  sCommand.DQSMode            = HAL_XSPI_DQS_DISABLE; // TODO ok?
+  sCommand.DQSMode            = HAL_XSPI_DQS_DISABLE;
   sCommand.SIOOMode           = HAL_XSPI_SIOO_INST_EVERY_CMD;
 
   if (HAL_XSPI_Command(hospi, &sCommand, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
@@ -681,9 +681,15 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
 
   /* Configure automatic polling mode to wait for write enabling ---- */
   sCommand.Instruction    = OCTAL_READ_STATUS_REG_CMD;
+  sCommand.AddressMode    = HAL_XSPI_ADDRESS_8_LINES;
+  sCommand.AddressDTRMode = HAL_XSPI_ADDRESS_DTR_ENABLE;
+  sCommand.AddressWidth   = HAL_XSPI_ADDRESS_32_BITS;
+  sCommand.Address        = 0;
   sCommand.DataMode       = HAL_XSPI_DATA_8_LINES;
   sCommand.DataDTRMode    = HAL_XSPI_DATA_DTR_ENABLE;
-  sCommand.DataLength     = 1;
+  sCommand.DummyCycles    = DUMMY_CLOCK_CYCLES_READ_REG_DTR;
+  sCommand.DataLength     = 2;
+  sCommand.DQSMode        = HAL_XSPI_DQS_ENABLE;
 
   if (HAL_XSPI_Command(hospi, &sCommand, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
   {
