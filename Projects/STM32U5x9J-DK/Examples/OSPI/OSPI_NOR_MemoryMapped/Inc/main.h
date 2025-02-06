@@ -89,10 +89,10 @@
 #define WRITE_ENABLE_CMD            0x06
 
 /* Dummy clocks cycles */
-//#define DUMMY_CLOCK_CYCLES_READ     6
-//#define DUMMY_CLOCK_CYCLES_READ_REG 4
+#define DUMMY_CLOCK_CYCLES_READ     6
+#define DUMMY_CLOCK_CYCLES_READ_REG 4
 
-#define DUMMY_CLOCK_CYCLES_READ_DTR     6
+#define DUMMY_CLOCK_CYCLES_READ_DTR     (6+0)
 #define DUMMY_CLOCK_CYCLES_READ_REG_DTR 5
 
 /* Auto-polling values */

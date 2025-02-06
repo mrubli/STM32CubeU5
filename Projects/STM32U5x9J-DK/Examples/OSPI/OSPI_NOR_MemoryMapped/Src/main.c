@@ -651,7 +651,7 @@ static void OSPI_AutoPollingMemReady(XSPI_HandleTypeDef *hospi)
 }
 
 /**
-  * @brief  This function configure the memory in Octal mode.
+  * @brief  This function configure the memory in Octal mode. (similar to OSPI_NOR_EnterDOPIMode)
   * @param  hospi: OSPI handle
   * @retval None
   */
@@ -659,7 +659,8 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
 {
   XSPI_RegularCmdTypeDef  sCommand = {0};
   XSPI_AutoPollingTypeDef sConfig = {0};
-  uint8_t reg;
+
+  // start of MX25UM51245G_WriteEnable
 
   /* Enable write operations ---------------------------------------- */
   sCommand.OperationType      = HAL_XSPI_OPTYPE_COMMON_CFG;
@@ -680,6 +681,7 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
   }
 
   /* Configure automatic polling mode to wait for write enabling ---- */
+#if 0
   sCommand.Instruction    = OCTAL_READ_STATUS_REG_CMD;
   sCommand.AddressMode    = HAL_XSPI_ADDRESS_8_LINES;
   sCommand.AddressDTRMode = HAL_XSPI_ADDRESS_DTR_ENABLE;
@@ -687,10 +689,26 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
   sCommand.Address        = 0;
   sCommand.DataMode       = HAL_XSPI_DATA_8_LINES;
   sCommand.DataDTRMode    = HAL_XSPI_DATA_DTR_ENABLE;
-  sCommand.DummyCycles    = DUMMY_CLOCK_CYCLES_READ_REG_DTR;
-  sCommand.DataLength     = 2;
+  sCommand.DummyCycles    = DUMMY_CLOCK_CYCLES_READ_REG_DTR; // data sheet says 4 not 5 (DUMMY_CLOCK_CYCLES_READ_REG_DTR)
+  sCommand.DataLength     = 2; // data sheet says 1
   sCommand.DQSMode        = HAL_XSPI_DQS_ENABLE;
+#else
+  sCommand.Instruction    = READ_STATUS_REG_CMD;
+  sCommand.InstructionMode    = HAL_XSPI_INSTRUCTION_8_LINES;
+  sCommand.InstructionWidth   = HAL_XSPI_INSTRUCTION_8_BITS;
+  sCommand.InstructionDTRMode = HAL_XSPI_INSTRUCTION_DTR_DISABLE;
+  sCommand.AddressMode    = HAL_XSPI_ADDRESS_8_LINES;
+  sCommand.AddressDTRMode = HAL_XSPI_ADDRESS_DTR_DISABLE;
+  sCommand.AddressWidth   = HAL_XSPI_ADDRESS_32_BITS;
+  sCommand.Address        = 0;
+  sCommand.DataMode       = HAL_XSPI_DATA_8_LINES;
+  sCommand.DataDTRMode    = HAL_XSPI_DATA_DTR_DISABLE;
+  sCommand.DummyCycles    = DUMMY_CLOCK_CYCLES_READ_REG;
+  sCommand.DataLength     = 1;
+  sCommand.DQSMode        = HAL_XSPI_DQS_DISABLE;
+#endif
 
+#if 0
   if (HAL_XSPI_Command(hospi, &sCommand, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
   {
     Error_Handler();
@@ -706,6 +724,24 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
   {
     Error_Handler();
   }
+#else
+  uint8_t regA[2] = {};
+  do {
+    if (HAL_XSPI_Command(hospi, &sCommand, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    if (HAL_XSPI_Receive(hospi, regA, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    printf("regA: 0x%02x 0x%02x\n", regA[0], regA[1]);
+  } while((regA[0] & WRITE_ENABLE_MASK_VALUE) != WRITE_ENABLE_MATCH_VALUE);
+#endif
+
+  // ^^^ end of MX25UM51245G_WriteEnable
 
   /* Write Configuration register 2 (with new dummy cycles) --------- */
   sCommand.Instruction    = OCTAL_WRITE_CFG_REG_2_CMD;
@@ -719,7 +755,7 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
     Error_Handler();
   }
 
-  reg = CR2_DUMMY_CYCLES_66MHZ;
+  uint8_t reg = CR2_DUMMY_CYCLES_66MHZ;
 
   if (HAL_XSPI_Transmit(hospi, &reg, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
   {
