@@ -156,7 +156,7 @@ static void XSPI_NOR_EnableMemoryMapped(XSPI_HandleTypeDef *hxspi)
   sCommand.AlternateBytesMode = HAL_XSPI_ALT_BYTES_NONE;
   sCommand.DataDTRMode        = HAL_XSPI_DATA_DTR_DISABLE;
   sCommand.DataMode      = HAL_XSPI_DATA_8_LINES;
-  sCommand.DataLength    = 1;
+  sCommand.DataLength    = 0; // ignored (only used for indirect mode)
   sCommand.DQSMode            = HAL_XSPI_DQS_DISABLE;
   sCommand.InstructionDTRMode = HAL_XSPI_INSTRUCTION_DTR_DISABLE;
   sCommand.InstructionMode    = HAL_XSPI_INSTRUCTION_8_LINES;
@@ -490,8 +490,8 @@ int main(void)
     VERIFY,
     DONE,
   };
-  uint8_t state = READ;
-  //uint8_t state = ERASE;
+  //uint8_t state = READ;
+  uint8_t state = ERASE;
 
   while (1)
   {
