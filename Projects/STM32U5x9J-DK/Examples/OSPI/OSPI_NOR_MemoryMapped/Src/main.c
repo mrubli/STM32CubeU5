@@ -111,34 +111,35 @@ static void XSPI_NOR_EnableMemoryMapped(XSPI_HandleTypeDef *hxspi)
 {
   XSPI_RegularCmdTypeDef sCommand = {0};
 
-  sCommand.InstructionMode    = HAL_XSPI_INSTRUCTION_8_LINES;
-  sCommand.InstructionWidth   = HAL_XSPI_INSTRUCTION_16_BITS;
-  sCommand.InstructionDTRMode = HAL_XSPI_INSTRUCTION_DTR_DISABLE;
-  sCommand.AddressWidth       = HAL_XSPI_ADDRESS_32_BITS;
   sCommand.AddressDTRMode     = HAL_XSPI_ADDRESS_DTR_DISABLE;
+  sCommand.AddressMode        = HAL_XSPI_ADDRESS_8_LINES;
+  sCommand.AddressWidth       = HAL_XSPI_ADDRESS_32_BITS;
   sCommand.AlternateBytesMode = HAL_XSPI_ALT_BYTES_NONE;
   sCommand.DataDTRMode        = HAL_XSPI_DATA_DTR_DISABLE;
+  sCommand.DataMode      = HAL_XSPI_DATA_8_LINES;
+  sCommand.DataLength    = 1;
   sCommand.DQSMode            = HAL_XSPI_DQS_DISABLE;
+  sCommand.InstructionDTRMode = HAL_XSPI_INSTRUCTION_DTR_DISABLE;
+  sCommand.InstructionMode    = HAL_XSPI_INSTRUCTION_8_LINES;
+  sCommand.InstructionWidth   = HAL_XSPI_INSTRUCTION_16_BITS;
   sCommand.SIOOMode           = HAL_XSPI_SIOO_INST_EVERY_CMD;
 
   /* Memory-mapped mode configuration ------------------------------- */
-  sCommand.OperationType = HAL_XSPI_OPTYPE_WRITE_CFG;
-  sCommand.Instruction   = OCTAL_PAGE_PROG_CMD;
-  sCommand.DataMode      = HAL_XSPI_DATA_8_LINES;
-  sCommand.DataLength    = 1;
-  sCommand.DQSMode       = HAL_XSPI_DQS_ENABLE;
-  sCommand.AddressMode        = HAL_XSPI_ADDRESS_8_LINES;
-  sCommand.DummyCycles        = 0;
+  sCommand.DQSMode       = HAL_XSPI_DQS_DISABLE;
+  sCommand.DummyCycles   = DUMMY_CLOCK_CYCLES_READ;
+  sCommand.Instruction   = OCTAL_IO_READ_CMD;
+  sCommand.OperationType = HAL_XSPI_OPTYPE_READ_CFG;
 
   if (HAL_XSPI_Command(hxspi, &sCommand, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
   {
     Error_Handler();
   }
 
-  sCommand.OperationType = HAL_XSPI_OPTYPE_READ_CFG;
-  sCommand.Instruction   = OCTAL_IO_READ_CMD;
-  sCommand.DummyCycles   = DUMMY_CLOCK_CYCLES_READ;
-  sCommand.DQSMode       = HAL_XSPI_DQS_DISABLE;
+  /* Memory-mapped mode configuration ------------------------------- */
+  sCommand.DQSMode       = HAL_XSPI_DQS_ENABLE;
+  sCommand.DummyCycles        = 0;
+  sCommand.Instruction   = OCTAL_PAGE_PROG_CMD;
+  sCommand.OperationType = HAL_XSPI_OPTYPE_WRITE_CFG;
 
   if (HAL_XSPI_Command(hxspi, &sCommand, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
   {
