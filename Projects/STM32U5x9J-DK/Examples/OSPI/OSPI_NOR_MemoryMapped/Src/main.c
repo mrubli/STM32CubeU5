@@ -20,6 +20,8 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include <stdio.h>
+#include <stdbool.h>
+#include <string.h>
 
 /** @addtogroup STM32U5xx_HAL_Examples
   * @{
@@ -103,6 +105,43 @@ static HAL_StatusTypeDef XSPI_NOR_Read(XSPI_HandleTypeDef *hxspi, uint32_t addr,
     Error_Handler();
     return HAL_ERROR;
   }
+
+  return HAL_OK;
+}
+
+static HAL_StatusTypeDef XSPI_NOR_Erase_Block(XSPI_HandleTypeDef *hxspi, uint32_t BlockAddress)
+{
+  XSPI_RegularCmdTypeDef sCommand = {0};
+
+  sCommand.InstructionMode    = HAL_XSPI_INSTRUCTION_8_LINES;
+  sCommand.InstructionWidth   = HAL_XSPI_INSTRUCTION_16_BITS;
+  sCommand.InstructionDTRMode = HAL_XSPI_INSTRUCTION_DTR_DISABLE;
+  sCommand.AddressWidth       = HAL_XSPI_ADDRESS_32_BITS;
+  sCommand.AddressDTRMode     = HAL_XSPI_ADDRESS_DTR_DISABLE;
+  sCommand.AlternateBytesMode = HAL_XSPI_ALT_BYTES_NONE;
+  sCommand.DataDTRMode        = HAL_XSPI_DATA_DTR_DISABLE;
+  sCommand.DQSMode            = HAL_XSPI_DQS_DISABLE;
+  sCommand.SIOOMode           = HAL_XSPI_SIOO_INST_EVERY_CMD;
+
+  /* Enable write operations ------------------------------------------ */
+  OSPI_WriteEnable(hxspi);
+
+  /* Erasing Sequence ------------------------------------------------- */
+  sCommand.OperationType = HAL_XSPI_OPTYPE_COMMON_CFG;
+  sCommand.Instruction   = OCTAL_SECTOR_ERASE_CMD;
+  sCommand.AddressMode   = HAL_XSPI_ADDRESS_8_LINES;
+  sCommand.Address       = BlockAddress;
+  sCommand.DataMode      = HAL_XSPI_DATA_NONE;
+  sCommand.DummyCycles   = 0;
+
+  if (HAL_XSPI_Command(hxspi, &sCommand, HAL_MAX_DELAY) != HAL_OK)
+  {
+    Error_Handler();
+    return HAL_ERROR;
+  }
+
+  /* Configure automatic polling mode to wait for end of erase ------ */
+  OSPI_AutoPollingMemReady(&OSPIHandle);
 
   return HAL_OK;
 }
@@ -194,6 +233,147 @@ static void dump_flash_at_offset(size_t offset, size_t len)
     printf("\n");
 }
 
+#define DBG_PRINT(fmt, ...) printf(fmt "\n" __VA_OPT__(, ) __VA_ARGS__);
+
+uint32_t * const ext_flash_start = (uint32_t *)OCTOSPI1_BASE;
+//uint32_t * const ext_flash_end   = (uint32_t *)&_ext_flash_end;
+//const uint32_t   ext_flash_size  = (ext_flash_end - ext_flash_start) * sizeof(*ext_flash_start);
+
+void ext_flash_erase_block_addr(uint32_t blockAddr)
+{
+  DBG_PRINT("erasing block 0x%08lx ...", blockAddr);
+  const HAL_StatusTypeDef status = XSPI_NOR_Erase_Block(&OSPIHandle, blockAddr);
+  if (status == HAL_OK)
+  {
+    DBG_PRINT("erased block 0x%08lx", blockAddr);
+  }
+  else
+  {
+    DBG_PRINT("ERROR: failed to erase block 0x%08lx: %d", blockAddr, status);
+    Error_Handler();
+  }
+}
+
+void ext_flash_test_memory_mapped(bool read, bool write, bool verify)
+{
+  DBG_PRINT("enabling memory-mapping ...");
+  XSPI_NOR_EnableMemoryMapped(&OSPIHandle);
+  DBG_PRINT("memory-mapping enabled");
+
+  if (read)
+  {
+    DBG_PRINT("reading memory-mapped ...");
+    dump_flash_at_addr(ext_flash_start, 32);
+    //dump_flash_at_addr(ext_flash_end - 32, 32);
+    DBG_PRINT("done reading memory-mapped");
+  }
+
+  if (write)
+  {
+    DBG_PRINT("writing memory-mapped ...");
+    uint8_t *mem = (uint8_t *)(ext_flash_start);
+    for (int i = 0; i < 256; i++)
+      *mem++ = (uint8_t)i;
+
+    HAL_Delay(MEMORY_PAGE_PROG_DELAY);
+    DBG_PRINT("done writing memory-mapped");
+  }
+
+  if (verify)
+  {
+    DBG_PRINT("verifying memory-mapped ...");
+    uint8_t *mem = (uint8_t *)(ext_flash_start);
+    int bad = 0;
+    for (int i = 0; i < 256; i++)
+    {
+      if (*mem++ != (uint8_t)i)
+      {
+        bad++;
+      }
+    }
+    if (bad == 0)
+    {
+      DBG_PRINT("verification successful");
+    }
+    else
+    {
+      DBG_PRINT("verification FAILED (%d bad bytes)", bad);
+    }
+  }
+
+  DBG_PRINT("disabling memory-mapping ...");
+  XSPI_NOR_DisableMemoryMapped(&OSPIHandle);
+  DBG_PRINT("memory-mapping disabled");
+}
+
+void ext_flash_test_indirect(bool read, bool write, bool verify)
+{
+  static uint8_t buf[256];
+
+  memset(buf, 0, sizeof(buf));
+
+  if (read)
+  {
+    DBG_PRINT("reading indirect ...");
+    dump_flash_at_offset(0, 32);
+    //dump_flash_at_offset(ext_flash_size - 32, 32);
+    DBG_PRINT("done reading indirect");
+  }
+
+  if (write)
+  {
+#if 1
+    printf("ERROR: indirect writing not implemented");
+#else
+    for (int i = 0; i < sizeof(buf); i++)
+      buf[i] = i;
+
+    DBG_PRINT("writing indirect ...");
+    const auto status = XSPI_NOR_Write(&OSPIHandle, (uint8_t *)buf, 0, sizeof(buf));
+    if (status == 0)
+    {
+      DBG_PRINT("done writing indirect");
+    }
+    else
+    {
+      DBG_PRINT("ERROR: indirect write failed: %d", status);
+      Error_Handler();
+    }
+#endif
+  }
+
+  if (verify)
+  {
+    DBG_PRINT("verifying indirect ...");
+
+    const HAL_StatusTypeDef status = XSPI_NOR_Read(&OSPIHandle, 0, (uint8_t *)buf, sizeof(buf));
+    if (status == HAL_OK)
+    {
+      int bad = 0;
+      for (int i = 0; i < 256; i++)
+      {
+        if (buf[i] != (uint8_t)i)
+        {
+          bad++;
+        }
+      }
+      if (bad == 0)
+      {
+        DBG_PRINT("verification successful");
+      }
+      else
+      {
+        DBG_PRINT("verification FAILED (%d bad bytes)", bad);
+      }
+    }
+    else
+    {
+      DBG_PRINT("ERROR: indirect verification read failed: %d", status);
+      Error_Handler();
+    }
+  }
+}
+
 /**
   * @brief  Main program
   * @param  None
@@ -201,8 +381,7 @@ static void dump_flash_at_offset(size_t offset, size_t len)
   */
 int main(void)
 {
-  XSPI_RegularCmdTypeDef sCommand = {0};
-  uint32_t address = 0;
+//  XSPI_RegularCmdTypeDef sCommand = {0};
 
   /* STM32U5xx HAL library initialization:
   - Configure the Flash prefetch
@@ -251,18 +430,47 @@ int main(void)
   /* Configure the memory in octal mode ------------------------------------- */
   OSPI_OctalModeCfg(&OSPIHandle);
 
-  sCommand.InstructionMode    = HAL_XSPI_INSTRUCTION_8_LINES;
-  sCommand.InstructionWidth   = HAL_XSPI_INSTRUCTION_16_BITS;
-  sCommand.InstructionDTRMode = HAL_XSPI_INSTRUCTION_DTR_DISABLE;
-  sCommand.AddressWidth       = HAL_XSPI_ADDRESS_32_BITS;
-  sCommand.AddressDTRMode     = HAL_XSPI_ADDRESS_DTR_DISABLE;
-  sCommand.AlternateBytesMode = HAL_XSPI_ALT_BYTES_NONE;
-  sCommand.DataDTRMode        = HAL_XSPI_DATA_DTR_DISABLE;
-  sCommand.DQSMode            = HAL_XSPI_DQS_DISABLE;
-  sCommand.SIOOMode           = HAL_XSPI_SIOO_INST_EVERY_CMD;
+//  sCommand.InstructionMode    = HAL_XSPI_INSTRUCTION_8_LINES;
+//  sCommand.InstructionWidth   = HAL_XSPI_INSTRUCTION_16_BITS;
+//  sCommand.InstructionDTRMode = HAL_XSPI_INSTRUCTION_DTR_DISABLE;
+//  sCommand.AddressWidth       = HAL_XSPI_ADDRESS_32_BITS;
+//  sCommand.AddressDTRMode     = HAL_XSPI_ADDRESS_DTR_DISABLE;
+//  sCommand.AlternateBytesMode = HAL_XSPI_ALT_BYTES_NONE;
+//  sCommand.DataDTRMode        = HAL_XSPI_DATA_DTR_DISABLE;
+//  sCommand.DQSMode            = HAL_XSPI_DQS_DISABLE;
+//  sCommand.SIOOMode           = HAL_XSPI_SIOO_INST_EVERY_CMD;
 
   BSP_LED_Off(LED_GREEN);
   BSP_LED_Off(LED_RED);
+
+#if 1
+  const bool UseMemoryMapping = true;
+  const bool Erase  = true;
+  const bool Read   = !true;
+  const bool Write  = true;
+  const bool Verify = true;
+
+  HAL_Delay(1000);
+
+  DBG_PRINT("\n===\nTesting external flash ...");
+
+  if (Erase)
+  {
+    ext_flash_erase_block_addr(0);
+  }
+
+  if (UseMemoryMapping)
+  {
+    ext_flash_test_memory_mapped(Read, Write, Verify);
+  }
+  else
+  {
+    ext_flash_test_indirect(Read, Write, Verify);
+  }
+  DBG_PRINT("===\n");
+
+  while (1) {}
+#endif
 
   // Enable for dumping and/or inspection using an external flash programmer
 #if 0
@@ -288,24 +496,7 @@ int main(void)
       case ERASE:
       {
         printf("ERASE\n");
-        /* Enable write operations ------------------------------------------ */
-        OSPI_WriteEnable(&OSPIHandle);
-
-        /* Erasing Sequence ------------------------------------------------- */
-        sCommand.OperationType = HAL_XSPI_OPTYPE_COMMON_CFG;
-        sCommand.Instruction   = OCTAL_SECTOR_ERASE_CMD;
-        sCommand.AddressMode   = HAL_XSPI_ADDRESS_8_LINES;
-        sCommand.Address       = address;
-        sCommand.DataMode      = HAL_XSPI_DATA_NONE;
-        sCommand.DummyCycles   = 0;
-
-        if (HAL_XSPI_Command(&OSPIHandle, &sCommand, HAL_MAX_DELAY) != HAL_OK)
-        {
-          Error_Handler();
-        }
-
-        /* Configure automatic polling mode to wait for end of erase ------ */
-        OSPI_AutoPollingMemReady(&OSPIHandle);
+        ext_flash_erase_block_addr(0);
 
         state = WRITE;
         break;
