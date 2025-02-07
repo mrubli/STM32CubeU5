@@ -256,6 +256,10 @@ void ext_flash_erase_block_addr(uint32_t blockAddr)
 
 void ext_flash_test_memory_mapped(bool read, bool write, bool verify)
 {
+  DBG_PRINT("setting write-enable ...");
+  OSPI_WriteEnable(&OSPIHandle);
+  DBG_PRINT("write-enable set");
+
   DBG_PRINT("enabling memory-mapping ...");
   XSPI_NOR_EnableMemoryMapped(&OSPIHandle);
   DBG_PRINT("memory-mapping enabled");
