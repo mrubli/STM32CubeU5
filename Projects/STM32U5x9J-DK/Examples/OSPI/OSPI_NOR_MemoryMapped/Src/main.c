@@ -857,6 +857,8 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
   XSPI_AutoPollingTypeDef sConfig = {0};
   uint8_t reg;
 
+// MX25UM51245G_WriteEnable
+
   /* Enable write operations ---------------------------------------- */
   sCommand.OperationType      = HAL_XSPI_OPTYPE_COMMON_CFG;
   sCommand.Instruction        = WRITE_ENABLE_CMD;
@@ -897,6 +899,8 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
     Error_Handler();
   }
 
+// MX25UM51245G_WriteCfg2Register
+
   /* Write Configuration register 2 (with new dummy cycles) --------- */
   sCommand.Instruction    = WRITE_CFG_REG_2_CMD;
   sCommand.Address        = CONFIG_REG2_ADDR3;
@@ -916,6 +920,8 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
     Error_Handler();
   }
 
+// TODO not done in prept
+
   /* Wait that the memory is ready ---------------------------------- */
   sCommand.Instruction = READ_STATUS_REG_CMD;
   sCommand.AddressMode = HAL_XSPI_ADDRESS_NONE;
@@ -932,6 +938,8 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
   {
     Error_Handler();
   }
+
+// MX25UM51245G_WriteEnable
 
   /* Enable write operations ---------------------------------------- */
   sCommand.Instruction = WRITE_ENABLE_CMD;
@@ -959,6 +967,8 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
     Error_Handler();
   }
 
+// MX25UM51245G_WriteCfg2Register
+
   /* Write Configuration register 2 (with octal mode) --------------- */
   sCommand.Instruction = WRITE_CFG_REG_2_CMD;
   sCommand.Address     = CONFIG_REG2_ADDR1;
@@ -975,6 +985,8 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
   {
     Error_Handler();
   }
+
+// also in prept
 
   /* Wait that the configuration is effective and check that memory is ready */
   HAL_Delay(MEMORY_REG_WRITE_DELAY);
