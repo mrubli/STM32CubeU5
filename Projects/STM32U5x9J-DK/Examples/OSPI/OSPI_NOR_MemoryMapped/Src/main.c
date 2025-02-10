@@ -43,7 +43,7 @@ static void SystemClock_Config(void);
 static void CACHE_Enable(void);
 static void Error_Handler(void);
 static void OSPI_WriteEnable(XSPI_HandleTypeDef *hospi);
-static void OSPI_AutoPollingMemReady(XSPI_HandleTypeDef *hospi);
+static void OSPI_AutoPollingMemReady(XSPI_HandleTypeDef *hospi, bool opi, bool dtr);
 static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi);
 HAL_StatusTypeDef OSPIClock_Config(void);
 
@@ -140,7 +140,7 @@ static HAL_StatusTypeDef XSPI_NOR_Erase_Block(XSPI_HandleTypeDef *hxspi, uint32_
   }
 
   /* Configure automatic polling mode to wait for end of erase ------ */
-  OSPI_AutoPollingMemReady(&OSPIHandle);
+  OSPI_AutoPollingMemReady(&OSPIHandle, true, true);
 
   return HAL_OK;
 }
@@ -412,7 +412,7 @@ int main(void)
   HAL_XSPI_DeInit(&OSPIHandle);
 
   OSPIHandle.Init.FifoThresholdByte         = 4;
-  OSPIHandle.Init.MemoryType                = HAL_XSPI_MEMTYPE_MACRONIX;
+  OSPIHandle.Init.MemoryType                = HAL_XSPI_MEMTYPE_MICRON;
   OSPIHandle.Init.MemorySize                = HAL_XSPI_SIZE_512MB;
   OSPIHandle.Init.ChipSelectHighTimeCycle   = 2;
   OSPIHandle.Init.FreeRunningClock          = HAL_XSPI_FREERUNCLK_DISABLE;
@@ -420,7 +420,7 @@ int main(void)
   OSPIHandle.Init.WrapSize                  = HAL_XSPI_WRAP_NOT_SUPPORTED;
   OSPIHandle.Init.ClockPrescaler            = 1;
   OSPIHandle.Init.SampleShifting            = HAL_XSPI_SAMPLE_SHIFT_NONE;
-  OSPIHandle.Init.DelayHoldQuarterCycle     = HAL_XSPI_DHQC_ENABLE;
+  OSPIHandle.Init.DelayHoldQuarterCycle     = HAL_XSPI_DHQC_DISABLE;
   OSPIHandle.Init.ChipSelectBoundary        = HAL_XSPI_BONDARYOF_NONE;
 
   if (HAL_XSPI_Init(&OSPIHandle) != HAL_OK)
@@ -579,10 +579,10 @@ int main(void)
         XSPI_NOR_DisableMemoryMapped(&OSPIHandle);
 
         // TODO unsure if this does anything. OSPI_AutoPollingMemReady() crashes before HAL_XSPI_Abort()
-        const uint32_t before = HAL_GetTick();
-        OSPI_AutoPollingMemReady(&OSPIHandle);
-        const uint32_t after = HAL_GetTick();
-        printf("OSPI_AutoPollingMemReady() took %lu ms\n", after - before);
+        //const uint32_t before = HAL_GetTick();
+        //OSPI_AutoPollingMemReady(&OSPIHandle);
+        //const uint32_t after = HAL_GetTick();
+        //printf("OSPI_AutoPollingMemReady() took %lu ms\n", after - before);
 
         state = VERIFY;
         break;
@@ -793,27 +793,28 @@ static void OSPI_WriteEnable(XSPI_HandleTypeDef *hospi)
   * @param  hospi: OSPI handle
   * @retval None
   */
-static void OSPI_AutoPollingMemReady(XSPI_HandleTypeDef *hospi)
+// TODO this needs to support STR and DTR
+static void OSPI_AutoPollingMemReady(XSPI_HandleTypeDef *hospi, bool opi, bool dtr)
 {
   XSPI_RegularCmdTypeDef  sCommand = {0};
   XSPI_AutoPollingTypeDef sConfig = {0};
 
   /* Configure automatic polling mode to wait for memory ready ------ */
   sCommand.OperationType      = HAL_XSPI_OPTYPE_COMMON_CFG;
-  sCommand.Instruction        = OCTAL_READ_STATUS_REG_CMD;
-  sCommand.InstructionMode    = HAL_XSPI_INSTRUCTION_8_LINES;
-  sCommand.InstructionWidth   = HAL_XSPI_INSTRUCTION_16_BITS;
-  sCommand.InstructionDTRMode = HAL_XSPI_INSTRUCTION_DTR_ENABLE;
+  sCommand.Instruction        = opi ? OCTAL_READ_STATUS_REG_CMD : READ_STATUS_REG_CMD;
+  sCommand.InstructionMode    = opi ? HAL_XSPI_INSTRUCTION_8_LINES : HAL_XSPI_INSTRUCTION_1_LINE;
+  sCommand.InstructionWidth   = opi ? HAL_XSPI_INSTRUCTION_16_BITS : HAL_XSPI_INSTRUCTION_8_BITS;
+  sCommand.InstructionDTRMode = dtr ? HAL_XSPI_INSTRUCTION_DTR_ENABLE : HAL_XSPI_INSTRUCTION_DTR_DISABLE;
   sCommand.Address            = 0x0;
-  sCommand.AddressMode        = HAL_XSPI_ADDRESS_8_LINES;
+  sCommand.AddressMode        = opi ? HAL_XSPI_ADDRESS_8_LINES : HAL_XSPI_ADDRESS_1_LINE;
   sCommand.AddressWidth       = HAL_XSPI_ADDRESS_32_BITS;
-  sCommand.AddressDTRMode     = HAL_XSPI_ADDRESS_DTR_ENABLE;
+  sCommand.AddressDTRMode     = dtr ? HAL_XSPI_ADDRESS_DTR_ENABLE : HAL_XSPI_ADDRESS_DTR_DISABLE;
   sCommand.AlternateBytesMode = HAL_XSPI_ALT_BYTES_NONE;
-  sCommand.DataMode           = HAL_XSPI_DATA_8_LINES;
-  sCommand.DataDTRMode        = HAL_XSPI_DATA_DTR_DISABLE;
-  sCommand.DataLength         = 2;
-  sCommand.DummyCycles        = DUMMY_CLOCK_CYCLES_READ_REG_DTR;
-  sCommand.DQSMode            = HAL_XSPI_DQS_ENABLE;
+  sCommand.DataMode           = opi ? HAL_XSPI_DATA_8_LINES : HAL_XSPI_DATA_1_LINE;
+  sCommand.DataDTRMode        = dtr ? HAL_XSPI_DATA_DTR_ENABLE : HAL_XSPI_DATA_DTR_DISABLE;
+  sCommand.DataLength         = dtr ? 2 : 1;
+  sCommand.DummyCycles        = opi ? (dtr ? DUMMY_CLOCK_CYCLES_READ_REG_DTR : DUMMY_CLOCK_CYCLES_READ_REG) : 0;
+  sCommand.DQSMode            = dtr ? HAL_XSPI_DQS_ENABLE : HAL_XSPI_DQS_DISABLE;
   sCommand.SIOOMode           = HAL_XSPI_SIOO_INST_EVERY_CMD;
 
   if (HAL_XSPI_Command(hospi, &sCommand, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
@@ -848,10 +849,10 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
 
   /* Enable write operations ---------------------------------------- */
   sCommand.OperationType      = HAL_XSPI_OPTYPE_COMMON_CFG;
-  sCommand.Instruction        = OCTAL_WRITE_ENABLE_CMD;
-  sCommand.InstructionMode    = HAL_XSPI_INSTRUCTION_8_LINES;
-  sCommand.InstructionWidth   = HAL_XSPI_INSTRUCTION_16_BITS;
-  sCommand.InstructionDTRMode = HAL_XSPI_INSTRUCTION_DTR_ENABLE;
+  sCommand.Instruction        = WRITE_ENABLE_CMD;
+  sCommand.InstructionMode    = HAL_XSPI_INSTRUCTION_1_LINE;
+  sCommand.InstructionWidth   = HAL_XSPI_INSTRUCTION_8_BITS;
+  sCommand.InstructionDTRMode = HAL_XSPI_INSTRUCTION_DTR_DISABLE;
   sCommand.AddressMode        = HAL_XSPI_ADDRESS_NONE;
   sCommand.AlternateBytesMode = HAL_XSPI_ALT_BYTES_NONE;
   sCommand.DataMode           = HAL_XSPI_DATA_NONE;
@@ -865,16 +866,16 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
   }
 
   /* Configure automatic polling mode to wait for write enabling ---- */
-  sCommand.Instruction    = OCTAL_READ_STATUS_REG_CMD;
-  sCommand.AddressMode    = HAL_XSPI_ADDRESS_8_LINES;
-  sCommand.AddressDTRMode = HAL_XSPI_ADDRESS_DTR_ENABLE;
+  sCommand.Instruction    = READ_STATUS_REG_CMD;
+  sCommand.AddressMode    = HAL_XSPI_ADDRESS_1_LINE;
+  sCommand.AddressDTRMode = HAL_XSPI_ADDRESS_DTR_DISABLE;
   sCommand.AddressWidth   = HAL_XSPI_ADDRESS_32_BITS;
   sCommand.Address        = 0;
-  sCommand.DataMode       = HAL_XSPI_DATA_8_LINES;
-  sCommand.DataDTRMode    = HAL_XSPI_DATA_DTR_ENABLE;
-  sCommand.DummyCycles    = DUMMY_CLOCK_CYCLES_READ_REG_DTR;
-  sCommand.DataLength     = 2;
-  sCommand.DQSMode        = HAL_XSPI_DQS_ENABLE;
+  sCommand.DataMode       = HAL_XSPI_DATA_1_LINE;
+  sCommand.DataDTRMode    = HAL_XSPI_DATA_DTR_DISABLE;
+  sCommand.DummyCycles    = 0;
+  sCommand.DataLength     = 1;
+  sCommand.DQSMode        = HAL_XSPI_DQS_DISABLE;
 
   if (HAL_XSPI_Command(hospi, &sCommand, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
   {
@@ -895,11 +896,11 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
 // MX25UM51245G_WriteCfg2Register
 
   /* Write Configuration register 2 (with new dummy cycles) --------- */
-  sCommand.Instruction    = OCTAL_WRITE_CFG_REG_2_CMD;
+  sCommand.Instruction    = WRITE_CFG_REG_2_CMD;
   sCommand.Address        = CONFIG_REG2_ADDR3;
-  sCommand.AddressMode    = HAL_XSPI_ADDRESS_8_LINES;
+  sCommand.AddressMode    = HAL_XSPI_ADDRESS_1_LINE;
   sCommand.AddressWidth   = HAL_XSPI_ADDRESS_32_BITS;
-  sCommand.AddressDTRMode = HAL_XSPI_ADDRESS_DTR_ENABLE;
+  sCommand.AddressDTRMode = HAL_XSPI_ADDRESS_DTR_DISABLE;
 
   if (HAL_XSPI_Command(hospi, &sCommand, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
   {
@@ -916,7 +917,7 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
 // TODO not done in prept
 
   /* Wait that the memory is ready ---------------------------------- */
-  sCommand.Instruction = OCTAL_READ_STATUS_REG_CMD;
+  sCommand.Instruction = READ_STATUS_REG_CMD;
   sCommand.AddressMode = HAL_XSPI_ADDRESS_NONE;
 
   if (HAL_XSPI_Command(hospi, &sCommand, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
@@ -935,7 +936,7 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
 // MX25UM51245G_WriteEnable
 
   /* Enable write operations ---------------------------------------- */
-  sCommand.Instruction = OCTAL_WRITE_ENABLE_CMD;
+  sCommand.Instruction = WRITE_ENABLE_CMD;
   sCommand.DataMode    = HAL_XSPI_DATA_NONE;
 
   if (HAL_XSPI_Command(hospi, &sCommand, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
@@ -944,8 +945,8 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
   }
 
   /* Configure automatic polling mode to wait for write enabling ---- */
-  sCommand.Instruction = OCTAL_READ_STATUS_REG_CMD;
-  sCommand.DataMode    = HAL_XSPI_DATA_8_LINES;
+  sCommand.Instruction = READ_STATUS_REG_CMD;
+  sCommand.DataMode    = HAL_XSPI_DATA_1_LINE;
 
   if (HAL_XSPI_Command(hospi, &sCommand, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
   {
@@ -963,9 +964,9 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
 // MX25UM51245G_WriteCfg2Register
 
   /* Write Configuration register 2 (with octal mode) --------------- */
-  sCommand.Instruction = OCTAL_WRITE_CFG_REG_2_CMD;
+  sCommand.Instruction = WRITE_CFG_REG_2_CMD;
   sCommand.Address     = CONFIG_REG2_ADDR1;
-  sCommand.AddressMode = HAL_XSPI_ADDRESS_8_LINES;
+  sCommand.AddressMode = HAL_XSPI_ADDRESS_1_LINE;
 
   if (HAL_XSPI_Command(hospi, &sCommand, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
   {
@@ -984,8 +985,15 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
   /* Wait that the configuration is effective and check that memory is ready */
   HAL_Delay(MEMORY_REG_WRITE_DELAY);
 
+  OSPIHandle.Init.MemoryType                = HAL_XSPI_MEMTYPE_MACRONIX;
+  OSPIHandle.Init.DelayHoldQuarterCycle     = HAL_XSPI_DHQC_ENABLE;
+  if (HAL_XSPI_Init(&OSPIHandle) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
   /* Wait that the memory is ready ---------------------------------- */
-  OSPI_AutoPollingMemReady(hospi);
+  OSPI_AutoPollingMemReady(hospi, true, true);
 }
 
 /**
