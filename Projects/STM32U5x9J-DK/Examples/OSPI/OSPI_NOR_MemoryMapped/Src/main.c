@@ -385,8 +385,6 @@ void ext_flash_test_indirect(bool read, bool write, bool verify)
   */
 int main(void)
 {
-//  XSPI_RegularCmdTypeDef sCommand = {0};
-
   /* STM32U5xx HAL library initialization:
   - Configure the Flash prefetch
   - Configure the Systick to generate an interrupt each 1 msec
@@ -433,16 +431,6 @@ int main(void)
 
   /* Configure the memory in octal mode ------------------------------------- */
   OSPI_OctalModeCfg(&OSPIHandle);
-
-//  sCommand.InstructionMode    = HAL_XSPI_INSTRUCTION_8_LINES;
-//  sCommand.InstructionWidth   = HAL_XSPI_INSTRUCTION_16_BITS;
-//  sCommand.InstructionDTRMode = HAL_XSPI_INSTRUCTION_DTR_DISABLE;
-//  sCommand.AddressWidth       = HAL_XSPI_ADDRESS_32_BITS;
-//  sCommand.AddressDTRMode     = HAL_XSPI_ADDRESS_DTR_DISABLE;
-//  sCommand.AlternateBytesMode = HAL_XSPI_ALT_BYTES_NONE;
-//  sCommand.DataDTRMode        = HAL_XSPI_DATA_DTR_DISABLE;
-//  sCommand.DQSMode            = HAL_XSPI_DQS_DISABLE;
-//  sCommand.SIOOMode           = HAL_XSPI_SIOO_INST_EVERY_CMD;
 
   BSP_LED_Off(LED_GREEN);
   BSP_LED_Off(LED_RED);
