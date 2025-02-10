@@ -36,15 +36,14 @@
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 XSPI_HandleTypeDef OSPIHandle;
-static uint8_t TempBuffer[256 + 16];
 
 /* Private function prototypes -----------------------------------------------*/
 static void SystemClock_Config(void);
 static void CACHE_Enable(void);
 static void Error_Handler(void);
-static void OSPI_WriteEnable(XSPI_HandleTypeDef *hospi);
+static void OSPI_WriteEnable(XSPI_HandleTypeDef *hospi, bool dtr);
 static void OSPI_AutoPollingMemReady(XSPI_HandleTypeDef *hospi, bool opi, bool dtr);
-static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi);
+static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi, bool dtr);
 HAL_StatusTypeDef OSPIClock_Config(void);
 
 /* Private functions ---------------------------------------------------------*/
@@ -69,7 +68,7 @@ static void dump_flash_at_addr(const void *addr, size_t len)
 }
 
 static HAL_StatusTypeDef XSPI_NOR_Read(XSPI_HandleTypeDef *hxspi, uint32_t addr,
-  uint8_t *pData, uint32_t size)
+  uint8_t *pData, uint32_t size, bool dtr)
 {
   XSPI_RegularCmdTypeDef sCommand = {0};
 
@@ -78,20 +77,20 @@ static HAL_StatusTypeDef XSPI_NOR_Read(XSPI_HandleTypeDef *hxspi, uint32_t addr,
   sCommand.Instruction        = OCTAL_IO_READ_CMD;
   sCommand.InstructionMode    = HAL_XSPI_INSTRUCTION_8_LINES;
   sCommand.InstructionWidth   = HAL_XSPI_INSTRUCTION_16_BITS;
-  sCommand.InstructionDTRMode = HAL_XSPI_INSTRUCTION_DTR_ENABLE;
+  sCommand.InstructionDTRMode = dtr ? HAL_XSPI_INSTRUCTION_DTR_ENABLE : HAL_XSPI_INSTRUCTION_DTR_DISABLE;
   sCommand.Address            = addr;
   sCommand.AddressMode        = HAL_XSPI_ADDRESS_8_LINES;
   sCommand.AddressWidth       = HAL_XSPI_ADDRESS_32_BITS;
-  sCommand.AddressDTRMode     = HAL_XSPI_ADDRESS_DTR_ENABLE;
+  sCommand.AddressDTRMode     = dtr ? HAL_XSPI_ADDRESS_DTR_ENABLE : HAL_XSPI_ADDRESS_DTR_DISABLE;
   sCommand.AlternateBytes     = 0;
   sCommand.AlternateBytesMode = HAL_XSPI_ALT_BYTES_NONE;			// default
   sCommand.AlternateBytesWidth = HAL_XSPI_ALT_BYTES_8_BITS;			// default
   sCommand.AlternateBytesDTRMode = HAL_XSPI_ALT_BYTES_DTR_DISABLE;	// default
   sCommand.DataMode           = HAL_XSPI_DATA_8_LINES;
   sCommand.DataLength         = size;
-  sCommand.DataDTRMode        = HAL_XSPI_DATA_DTR_ENABLE;
-  sCommand.DummyCycles        = DUMMY_CLOCK_CYCLES_READ_DTR;
-  sCommand.DQSMode            = HAL_XSPI_DQS_ENABLE;
+  sCommand.DataDTRMode        = dtr ? HAL_XSPI_DATA_DTR_ENABLE : HAL_XSPI_DATA_DTR_DISABLE;
+  sCommand.DummyCycles        = dtr ? DUMMY_CLOCK_CYCLES_READ_DTR : DUMMY_CLOCK_CYCLES_READ;
+  sCommand.DQSMode            = dtr ? HAL_XSPI_DQS_ENABLE : HAL_XSPI_DQS_DISABLE;
   sCommand.SIOOMode           = HAL_XSPI_SIOO_INST_EVERY_CMD;
 
   if (HAL_XSPI_Command(hxspi, &sCommand, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
@@ -109,21 +108,21 @@ static HAL_StatusTypeDef XSPI_NOR_Read(XSPI_HandleTypeDef *hxspi, uint32_t addr,
   return HAL_OK;
 }
 
-static HAL_StatusTypeDef XSPI_NOR_Erase_Block(XSPI_HandleTypeDef *hxspi, uint32_t BlockAddress)
+static HAL_StatusTypeDef XSPI_NOR_Erase_Block(XSPI_HandleTypeDef *hxspi, uint32_t BlockAddress, bool dtr)
 {
   XSPI_RegularCmdTypeDef sCommand = {0};
 
   sCommand.InstructionMode    = HAL_XSPI_INSTRUCTION_8_LINES;
   sCommand.InstructionWidth   = HAL_XSPI_INSTRUCTION_16_BITS;
-  sCommand.InstructionDTRMode = HAL_XSPI_INSTRUCTION_DTR_ENABLE;
+  sCommand.InstructionDTRMode = dtr ? HAL_XSPI_INSTRUCTION_DTR_ENABLE : HAL_XSPI_INSTRUCTION_DTR_DISABLE;
   sCommand.AddressWidth       = HAL_XSPI_ADDRESS_32_BITS;
-  sCommand.AddressDTRMode     = HAL_XSPI_ADDRESS_DTR_ENABLE;
+  sCommand.AddressDTRMode     = dtr ? HAL_XSPI_ADDRESS_DTR_ENABLE : HAL_XSPI_ADDRESS_DTR_DISABLE;
   sCommand.AlternateBytesMode = HAL_XSPI_ALT_BYTES_NONE;
-  sCommand.DataDTRMode        = HAL_XSPI_DATA_DTR_ENABLE;
+  sCommand.DataDTRMode        = dtr ? HAL_XSPI_DATA_DTR_ENABLE : HAL_XSPI_DATA_DTR_DISABLE;
   sCommand.SIOOMode           = HAL_XSPI_SIOO_INST_EVERY_CMD;
 
   /* Enable write operations ------------------------------------------ */
-  OSPI_WriteEnable(hxspi);
+  OSPI_WriteEnable(hxspi, dtr);
 
   /* Erasing Sequence ------------------------------------------------- */
   sCommand.OperationType = HAL_XSPI_OPTYPE_COMMON_CFG;
@@ -140,12 +139,12 @@ static HAL_StatusTypeDef XSPI_NOR_Erase_Block(XSPI_HandleTypeDef *hxspi, uint32_
   }
 
   /* Configure automatic polling mode to wait for end of erase ------ */
-  OSPI_AutoPollingMemReady(&OSPIHandle, true, true);
+  OSPI_AutoPollingMemReady(&OSPIHandle, true, dtr);
 
   return HAL_OK;
 }
 
-static void XSPI_NOR_EnableMemoryMapped(XSPI_HandleTypeDef *hxspi)
+static void XSPI_NOR_EnableMemoryMapped(XSPI_HandleTypeDef *hxspi, bool dtr)
 {
   XSPI_RegularCmdTypeDef sCommand = {0};
 
@@ -164,7 +163,7 @@ static void XSPI_NOR_EnableMemoryMapped(XSPI_HandleTypeDef *hxspi)
 
   /* Memory-mapped mode configuration ------------------------------- */
   sCommand.DQSMode       = HAL_XSPI_DQS_DISABLE;
-  sCommand.DummyCycles   = DUMMY_CLOCK_CYCLES_READ_DTR;
+  sCommand.DummyCycles   = dtr ? DUMMY_CLOCK_CYCLES_READ_DTR : DUMMY_CLOCK_CYCLES_READ;
   sCommand.Instruction   = OCTAL_IO_READ_CMD;
   sCommand.OperationType = HAL_XSPI_OPTYPE_READ_CFG;
 
@@ -201,7 +200,7 @@ static void XSPI_NOR_DisableMemoryMapped(XSPI_HandleTypeDef *hxspi)
   }
 }
 
-static void dump_flash_at_offset(size_t offset, size_t len)
+static void dump_flash_at_offset(size_t offset, size_t len, bool dtr)
 {
   const int BytesPerLine = 16;
   static uint8_t buf[32];
@@ -214,7 +213,7 @@ static void dump_flash_at_offset(size_t offset, size_t len)
     if (read_len > sizeof(buf))
       read_len = sizeof(buf);
 
-    if (XSPI_NOR_Read(&OSPIHandle, offset + dumped_len, buf, read_len) != HAL_OK)
+    if (XSPI_NOR_Read(&OSPIHandle, offset + dumped_len, buf, read_len, dtr) != HAL_OK)
     {
       printf("Read failed\n");
       return;
@@ -238,10 +237,10 @@ uint32_t * const ext_flash_start = (uint32_t *)OCTOSPI1_BASE;
 //uint32_t * const ext_flash_end   = (uint32_t *)&_ext_flash_end;
 //const uint32_t   ext_flash_size  = (ext_flash_end - ext_flash_start) * sizeof(*ext_flash_start);
 
-void ext_flash_erase_block_addr(uint32_t blockAddr)
+void ext_flash_erase_block_addr(uint32_t blockAddr, bool dtr)
 {
   DBG_PRINT("erasing block 0x%08lx ...", blockAddr);
-  const HAL_StatusTypeDef status = XSPI_NOR_Erase_Block(&OSPIHandle, blockAddr);
+  const HAL_StatusTypeDef status = XSPI_NOR_Erase_Block(&OSPIHandle, blockAddr, dtr);
   if (status == HAL_OK)
   {
     DBG_PRINT("erased block 0x%08lx", blockAddr);
@@ -253,14 +252,14 @@ void ext_flash_erase_block_addr(uint32_t blockAddr)
   }
 }
 
-void ext_flash_test_memory_mapped(bool read, bool write, bool verify)
+void ext_flash_test_memory_mapped(bool read, bool write, bool verify, bool dtr)
 {
   DBG_PRINT("setting write-enable ...");
-  OSPI_WriteEnable(&OSPIHandle);
+  OSPI_WriteEnable(&OSPIHandle, dtr);
   DBG_PRINT("write-enable set");
 
   DBG_PRINT("enabling memory-mapping ...");
-  XSPI_NOR_EnableMemoryMapped(&OSPIHandle);
+  XSPI_NOR_EnableMemoryMapped(&OSPIHandle, dtr);
   DBG_PRINT("memory-mapping enabled");
 
   if (read)
@@ -309,7 +308,7 @@ void ext_flash_test_memory_mapped(bool read, bool write, bool verify)
   DBG_PRINT("memory-mapping disabled");
 }
 
-void ext_flash_test_indirect(bool read, bool write, bool verify)
+void ext_flash_test_indirect(bool read, bool write, bool verify, bool dtr)
 {
   static uint8_t buf[256];
 
@@ -318,15 +317,15 @@ void ext_flash_test_indirect(bool read, bool write, bool verify)
   if (read)
   {
     DBG_PRINT("reading indirect ...");
-    dump_flash_at_offset(0, 32);
-    //dump_flash_at_offset(ext_flash_size - 32, 32);
+    dump_flash_at_offset(0, 32, dtr);
+    //dump_flash_at_offset(ext_flash_size - 32, 32, dtr);
     DBG_PRINT("done reading indirect");
   }
 
   if (write)
   {
 #if 1
-    printf("ERROR: indirect writing not implemented");
+    printf("ERROR: indirect writing not implemented\n");
 #else
     for (int i = 0; i < sizeof(buf); i++)
       buf[i] = i;
@@ -349,7 +348,7 @@ void ext_flash_test_indirect(bool read, bool write, bool verify)
   {
     DBG_PRINT("verifying indirect ...");
 
-    const HAL_StatusTypeDef status = XSPI_NOR_Read(&OSPIHandle, 0, (uint8_t *)buf, sizeof(buf));
+    const HAL_StatusTypeDef status = XSPI_NOR_Read(&OSPIHandle, 0, (uint8_t *)buf, sizeof(buf), dtr);
     if (status == HAL_OK)
     {
       int bad = 0;
@@ -428,13 +427,14 @@ int main(void)
     Error_Handler();
   }
 
+  const bool Dtr = false;
+
   /* Configure the memory in octal mode ------------------------------------- */
-  OSPI_OctalModeCfg(&OSPIHandle);
+  OSPI_OctalModeCfg(&OSPIHandle, Dtr);
 
   BSP_LED_Off(LED_GREEN);
   BSP_LED_Off(LED_RED);
 
-#if 1
   const bool UseMemoryMapping = true;
   const bool Erase  = true;
   const bool Read   = !true;
@@ -447,161 +447,20 @@ int main(void)
 
   if (Erase)
   {
-    ext_flash_erase_block_addr(0);
+    ext_flash_erase_block_addr(0, Dtr);
   }
 
   if (UseMemoryMapping)
   {
-    ext_flash_test_memory_mapped(Read, Write, Verify);
+    ext_flash_test_memory_mapped(Read, Write, Verify, Dtr);
   }
   else
   {
-    ext_flash_test_indirect(Read, Write, Verify);
+    ext_flash_test_indirect(Read, Write, Verify, Dtr);
   }
   DBG_PRINT("===\n");
 
   while (1) {}
-#endif
-
-  // Enable for dumping and/or inspection using an external flash programmer
-#if 0
-  dump_flash_at_offset(0, 256 + 16);
-  while (1)
-    HAL_Delay(1000);
-#endif
-
-  enum State {
-    ERASE = 0,
-    READ,
-    WRITE,
-    VERIFY,
-    DONE,
-  };
-  //uint8_t state = READ;
-  uint8_t state = ERASE;
-
-  while (1)
-  {
-    switch(state)
-    {
-      case ERASE:
-      {
-        printf("ERASE\n");
-        ext_flash_erase_block_addr(0);
-
-        state = WRITE;
-        break;
-      }
-      case READ:
-      case VERIFY:
-      {
-        printf(state == READ ? "READ\n" : "VERIFY\n");
-
-        XSPI_NOR_EnableMemoryMapped(&OSPIHandle);
-
-        dump_flash_at_addr((void *)OCTOSPI1_BASE, 256 + 16);
-
-        // Verify using memory-mapped access
-        int good1 = 1;
-        uint8_t *ext_flash = (uint8_t *)OCTOSPI1_BASE;
-        for (int i = 0; i < 256; i++)
-        {
-          if (ext_flash[i] != i)
-          {
-            good1 = 0;
-            break;
-          }
-        }
-        printf("Memory-mapped %s %s\n",
-          state == VERIFY ? "verification" : "reading",
-          good1 ? "succeeded" : "failed");
-
-        XSPI_NOR_DisableMemoryMapped(&OSPIHandle);
-
-        dump_flash_at_offset(0, 256 + 16);
-
-        // Verify using indirect access
-        int good2 = 1;
-        if (XSPI_NOR_Read(&OSPIHandle, 0, TempBuffer, sizeof(TempBuffer)) != HAL_OK)
-        {
-          good2 = 0;
-        }
-        else
-        {
-          for (int i = 0; i < 256; i++)
-          {
-            if (TempBuffer[i] != i)
-            {
-              good2 = 0;
-              break;
-            }
-          }
-        }
-        printf("Indirect %s %s\n",
-          state == VERIFY ? "verification" : "reading",
-          good2 ? "succeeded" : "failed");
-
-        if (state == VERIFY)
-        {
-          state = DONE;
-        }
-        else
-        {
-          //state = (good1 && good2) ? DONE : ERASE;    // ERASE → WRITE on failure
-          state = DONE;                   // don't ERASE/WRITE on failure
-        }
-        break;
-      }
-      case WRITE:
-      {
-        printf("WRITE\n");
-
-        /* Enable write operations ---------------------------------------- */
-        OSPI_WriteEnable(&OSPIHandle);
-
-        XSPI_NOR_EnableMemoryMapped(&OSPIHandle);
-
-        /* Writing Sequence ----------------------------------------------- */
-        uint8_t *ext_flash = (uint8_t *)OCTOSPI1_BASE;
-        for (int i = 0; i < 256; i++)
-        {
-          *ext_flash = (uint8_t)i;
-          ext_flash++;
-        }
-
-        /* In memory-mapped mode, not possible to check if the memory is ready
-        after the programming. So a delay corresponding to max page programming
-        time is added */
-        HAL_Delay(MEMORY_PAGE_PROG_DELAY);
-
-        dump_flash_at_addr((void *)OCTOSPI1_BASE, 256 + 16);
-
-        XSPI_NOR_DisableMemoryMapped(&OSPIHandle);
-
-        // TODO unsure if this does anything. OSPI_AutoPollingMemReady() crashes before HAL_XSPI_Abort()
-        //const uint32_t before = HAL_GetTick();
-        //OSPI_AutoPollingMemReady(&OSPIHandle);
-        //const uint32_t after = HAL_GetTick();
-        //printf("OSPI_AutoPollingMemReady() took %lu ms\n", after - before);
-
-        state = VERIFY;
-        break;
-      }
-      case DONE:
-      {
-        printf("DONE\n");
-#if 0 // Run the test in a reboot loop
-        HAL_Delay(10000);
-        HAL_NVIC_SystemReset();
-#endif
-        while(1)
-          HAL_Delay(1000);
-        break;
-      }
-      default:
-        Error_Handler();
-    }
-  }
 }
 
 /**
@@ -737,7 +596,7 @@ HAL_StatusTypeDef OSPIClock_Config(void)
   * @param  hospi: OSPI handle
   * @retval None
   */
-static void OSPI_WriteEnable(XSPI_HandleTypeDef *hospi)
+static void OSPI_WriteEnable(XSPI_HandleTypeDef *hospi, bool dtr)
 {
   XSPI_RegularCmdTypeDef  sCommand = {0};
   XSPI_AutoPollingTypeDef sConfig = {0};
@@ -747,7 +606,7 @@ static void OSPI_WriteEnable(XSPI_HandleTypeDef *hospi)
   sCommand.Instruction        = OCTAL_WRITE_ENABLE_CMD;
   sCommand.InstructionMode    = HAL_XSPI_INSTRUCTION_8_LINES;
   sCommand.InstructionWidth   = HAL_XSPI_INSTRUCTION_16_BITS;
-  sCommand.InstructionDTRMode = HAL_XSPI_INSTRUCTION_DTR_ENABLE;
+  sCommand.InstructionDTRMode = dtr ? HAL_XSPI_INSTRUCTION_DTR_ENABLE : HAL_XSPI_INSTRUCTION_DTR_DISABLE;
   sCommand.AddressMode        = HAL_XSPI_ADDRESS_NONE;
   sCommand.AlternateBytesMode = HAL_XSPI_ALT_BYTES_NONE;
   sCommand.DataMode           = HAL_XSPI_DATA_NONE;
@@ -765,11 +624,11 @@ static void OSPI_WriteEnable(XSPI_HandleTypeDef *hospi)
   sCommand.Address        = 0x0;
   sCommand.AddressMode    = HAL_XSPI_ADDRESS_8_LINES;
   sCommand.AddressWidth   = HAL_XSPI_ADDRESS_32_BITS;
-  sCommand.AddressDTRMode = HAL_XSPI_ADDRESS_DTR_ENABLE;
+  sCommand.AddressDTRMode = dtr ? HAL_XSPI_ADDRESS_DTR_ENABLE : HAL_XSPI_ADDRESS_DTR_DISABLE;
   sCommand.DataMode       = HAL_XSPI_DATA_8_LINES;
-  sCommand.DataDTRMode    = HAL_XSPI_DATA_DTR_ENABLE;
-  sCommand.DataLength     = 2;
-  sCommand.DummyCycles    = DUMMY_CLOCK_CYCLES_READ_REG_DTR;
+  sCommand.DataDTRMode    = dtr ? HAL_XSPI_DATA_DTR_ENABLE : HAL_XSPI_DATA_DTR_DISABLE;
+  sCommand.DataLength     = dtr ? 2 : 1; // TODO really?
+  sCommand.DummyCycles    = dtr ? DUMMY_CLOCK_CYCLES_READ_REG_DTR : DUMMY_CLOCK_CYCLES_READ_REG;
 
   if (HAL_XSPI_Command(hospi, &sCommand, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
   {
@@ -793,7 +652,6 @@ static void OSPI_WriteEnable(XSPI_HandleTypeDef *hospi)
   * @param  hospi: OSPI handle
   * @retval None
   */
-// TODO this needs to support STR and DTR
 static void OSPI_AutoPollingMemReady(XSPI_HandleTypeDef *hospi, bool opi, bool dtr)
 {
   XSPI_RegularCmdTypeDef  sCommand = {0};
@@ -839,7 +697,7 @@ static void OSPI_AutoPollingMemReady(XSPI_HandleTypeDef *hospi, bool opi, bool d
   * @param  hospi: OSPI handle
   * @retval None
   */
-static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
+static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi, bool dtr)
 {
   XSPI_RegularCmdTypeDef  sCommand = {0};
   XSPI_AutoPollingTypeDef sConfig = {0};
@@ -973,7 +831,7 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
     Error_Handler();
   }
 
-  reg = CR2_DTR_OPI_ENABLE;
+  reg = dtr ? CR2_DTR_OPI_ENABLE : CR2_STR_OPI_ENABLE;
 
   if (HAL_XSPI_Transmit(hospi, &reg, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
   {
@@ -993,7 +851,7 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
   }
 
   /* Wait that the memory is ready ---------------------------------- */
-  OSPI_AutoPollingMemReady(hospi, true, true);
+  OSPI_AutoPollingMemReady(hospi, true, dtr);
 }
 
 /**
