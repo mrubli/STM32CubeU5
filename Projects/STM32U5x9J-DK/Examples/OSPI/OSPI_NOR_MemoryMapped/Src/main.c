@@ -972,7 +972,7 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi)
     Error_Handler();
   }
 
-  reg = CR2_STR_OPI_ENABLE;
+  reg = CR2_DTR_OPI_ENABLE;
 
   if (HAL_XSPI_Transmit(hospi, &reg, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
   {

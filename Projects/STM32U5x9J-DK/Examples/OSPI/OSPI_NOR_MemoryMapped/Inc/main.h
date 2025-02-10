@@ -107,6 +107,7 @@
 /* Memory registers address */
 #define CONFIG_REG2_ADDR1           0x0000000
 #define CR2_STR_OPI_ENABLE          0x01
+#define CR2_DTR_OPI_ENABLE          0x02
 
 #define CONFIG_REG2_ADDR3           0x00000300
 #define CR2_DUMMY_CYCLES_66MHZ      0x07
