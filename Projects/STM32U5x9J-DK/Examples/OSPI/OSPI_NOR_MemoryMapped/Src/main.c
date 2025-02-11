@@ -427,7 +427,7 @@ int main(void)
     Error_Handler();
   }
 
-  const bool Dtr = false;
+  const bool Dtr = true;
 
   /* Configure the memory in octal mode ------------------------------------- */
   OSPI_OctalModeCfg(&OSPIHandle, Dtr);
@@ -598,6 +598,8 @@ HAL_StatusTypeDef OSPIClock_Config(void)
   */
 static void OSPI_WriteEnable(XSPI_HandleTypeDef *hospi, bool dtr)
 {
+  dtr = false; // TODO NEXT hangs in HAL_XSPI_AutoPolling, false doesn't help
+
   XSPI_RegularCmdTypeDef  sCommand = {0};
   XSPI_AutoPollingTypeDef sConfig = {0};
 
@@ -620,8 +622,9 @@ static void OSPI_WriteEnable(XSPI_HandleTypeDef *hospi, bool dtr)
   }
 
   /* Configure automatic polling mode to wait for write enabling ---- */
+  // TODO NEXT sync this with OSPI_AutoPollingMemReady below => looks okay
   sCommand.Instruction    = OCTAL_READ_STATUS_REG_CMD;
-  sCommand.Address        = 0x0;
+  sCommand.Address        = 0;
   sCommand.AddressMode    = HAL_XSPI_ADDRESS_8_LINES;
   sCommand.AddressWidth   = HAL_XSPI_ADDRESS_32_BITS;
   sCommand.AddressDTRMode = dtr ? HAL_XSPI_ADDRESS_DTR_ENABLE : HAL_XSPI_ADDRESS_DTR_DISABLE;
@@ -654,6 +657,8 @@ static void OSPI_WriteEnable(XSPI_HandleTypeDef *hospi, bool dtr)
   */
 static void OSPI_AutoPollingMemReady(XSPI_HandleTypeDef *hospi, bool opi, bool dtr)
 {
+  dtr = false; // TODO TEMP but prevents hang in dtr mode!
+
   XSPI_RegularCmdTypeDef  sCommand = {0};
   XSPI_AutoPollingTypeDef sConfig = {0};
 
@@ -663,14 +668,14 @@ static void OSPI_AutoPollingMemReady(XSPI_HandleTypeDef *hospi, bool opi, bool d
   sCommand.InstructionMode    = opi ? HAL_XSPI_INSTRUCTION_8_LINES : HAL_XSPI_INSTRUCTION_1_LINE;
   sCommand.InstructionWidth   = opi ? HAL_XSPI_INSTRUCTION_16_BITS : HAL_XSPI_INSTRUCTION_8_BITS;
   sCommand.InstructionDTRMode = dtr ? HAL_XSPI_INSTRUCTION_DTR_ENABLE : HAL_XSPI_INSTRUCTION_DTR_DISABLE;
-  sCommand.Address            = 0x0;
-  sCommand.AddressMode        = opi ? HAL_XSPI_ADDRESS_8_LINES : HAL_XSPI_ADDRESS_1_LINE;
+  sCommand.Address            = 0;
+  sCommand.AddressMode        = opi ? HAL_XSPI_ADDRESS_8_LINES : HAL_XSPI_ADDRESS_NONE; // MX25 spec: SPI = no address, OPI = 32 bits
   sCommand.AddressWidth       = HAL_XSPI_ADDRESS_32_BITS;
   sCommand.AddressDTRMode     = dtr ? HAL_XSPI_ADDRESS_DTR_ENABLE : HAL_XSPI_ADDRESS_DTR_DISABLE;
   sCommand.AlternateBytesMode = HAL_XSPI_ALT_BYTES_NONE;
   sCommand.DataMode           = opi ? HAL_XSPI_DATA_8_LINES : HAL_XSPI_DATA_1_LINE;
-  sCommand.DataDTRMode        = dtr ? HAL_XSPI_DATA_DTR_ENABLE : HAL_XSPI_DATA_DTR_DISABLE;
-  sCommand.DataLength         = dtr ? 2 : 1;
+  sCommand.DataDTRMode        = dtr ? HAL_XSPI_DATA_DTR_ENABLE : HAL_XSPI_DATA_DTR_DISABLE; // TODO MX25 spec suggests this should always be false
+  sCommand.DataLength         = dtr ? 2 : 1; // TODO why can this be 1 in SDR mode?!
   sCommand.DummyCycles        = opi ? (dtr ? DUMMY_CLOCK_CYCLES_READ_REG_DTR : DUMMY_CLOCK_CYCLES_READ_REG) : 0;
   sCommand.DQSMode            = dtr ? HAL_XSPI_DQS_ENABLE : HAL_XSPI_DQS_DISABLE;
   sCommand.SIOOMode           = HAL_XSPI_SIOO_INST_EVERY_CMD;
