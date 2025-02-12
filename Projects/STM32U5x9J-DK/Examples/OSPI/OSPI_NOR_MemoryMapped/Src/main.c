@@ -450,7 +450,7 @@ int main(void)
 
   const bool UseMemoryMapping = true;
   const bool Erase  = true;
-  const bool Read   = !true;
+  const bool Read   = true;
   const bool Write  = true;
   const bool Verify = true;
 
