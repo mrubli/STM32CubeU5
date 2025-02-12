@@ -70,6 +70,7 @@ static void dump_flash_at_addr(const void *addr, size_t len)
 static HAL_StatusTypeDef XSPI_NOR_Read(XSPI_HandleTypeDef *hxspi, uint32_t addr,
   uint8_t *pData, uint32_t size, bool dtr)
 {
+  printf("XSPI_NOR_Read(Rate: %s)\n", dtr ? "DTR" : "SDR");
   XSPI_RegularCmdTypeDef sCommand = {0};
 
   sCommand.OperationType      = HAL_XSPI_OPTYPE_COMMON_CFG;
@@ -110,6 +111,7 @@ static HAL_StatusTypeDef XSPI_NOR_Read(XSPI_HandleTypeDef *hxspi, uint32_t addr,
 
 static HAL_StatusTypeDef XSPI_NOR_Erase_Block(XSPI_HandleTypeDef *hxspi, uint32_t BlockAddress, bool dtr)
 {
+  printf("XSPI_NOR_Erase_Block(Rate: %s)\n", dtr ? "DTR" : "SDR");
   XSPI_RegularCmdTypeDef sCommand = {0};
 
   sCommand.InstructionMode    = HAL_XSPI_INSTRUCTION_8_LINES;
@@ -147,6 +149,7 @@ static HAL_StatusTypeDef XSPI_NOR_Erase_Block(XSPI_HandleTypeDef *hxspi, uint32_
 
 static void XSPI_NOR_EnableMemoryMapped(XSPI_HandleTypeDef *hxspi, bool dtr)
 {
+  printf("XSPI_NOR_EnableMemoryMapped(Rate: %s)\n", dtr ? "DTR" : "SDR");
   XSPI_RegularCmdTypeDef sCommand = {0};
 
   sCommand.AddressDTRMode     = HAL_XSPI_ADDRESS_DTR_DISABLE;
@@ -184,6 +187,8 @@ static void XSPI_NOR_EnableMemoryMapped(XSPI_HandleTypeDef *hxspi, bool dtr)
     Error_Handler();
   }
 
+  // this seems required to make memory mapping verification work (with the timeout counter disabled
+  // reading still works, so does writing, but verification fails).
   XSPI_MemoryMappedTypeDef sMemMappedCfg = {0};
   sMemMappedCfg.TimeOutActivation     = HAL_XSPI_TIMEOUT_COUNTER_ENABLE;
   sMemMappedCfg.TimeoutPeriodClock    = 0x40;
@@ -195,6 +200,7 @@ static void XSPI_NOR_EnableMemoryMapped(XSPI_HandleTypeDef *hxspi, bool dtr)
 
 static void XSPI_NOR_DisableMemoryMapped(XSPI_HandleTypeDef *hxspi)
 {
+  printf("XSPI_NOR_DisableMemoryMapped()\n");
   if (HAL_XSPI_Abort(hxspi) != HAL_OK)
   {
     Error_Handler();
@@ -606,6 +612,7 @@ HAL_StatusTypeDef OSPIClock_Config(void)
 static void OSPI_WriteEnable(XSPI_HandleTypeDef *hospi, bool dtr)
 {
   const bool opi = true; // AN5050 always uses SPI but using SPI breaks erase in our case (it silently doesn't erase)
+  printf("OSPI_WriteEnable(Mode: %s, Rate: %s)\n", opi ? "OPI" : "SPI", dtr ? "DTR" : "SDR");
 
   XSPI_RegularCmdTypeDef  sCommand = {0};
   XSPI_AutoPollingTypeDef sConfig = {0};
@@ -670,6 +677,7 @@ static void OSPI_WriteEnable(XSPI_HandleTypeDef *hospi, bool dtr)
   */
 static void OSPI_AutoPollingMemReady(XSPI_HandleTypeDef *hospi, bool opi, bool dtr)
 {
+  printf("OSPI_AutoPollingMemReady(Mode: %s, Rate: %s)\n", opi ? "OPI" : "SPI", dtr ? "DTR" : "SDR");
   XSPI_RegularCmdTypeDef  sCommand = {0};
   XSPI_AutoPollingTypeDef sConfig = {0};
 
@@ -715,6 +723,7 @@ static void OSPI_AutoPollingMemReady(XSPI_HandleTypeDef *hospi, bool opi, bool d
   */
 static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi, bool dtr)
 {
+  printf("OSPI_OctalModeCfg(Rate: %s)\n", dtr ? "DTR" : "SDR");
   XSPI_RegularCmdTypeDef  sCommand = {0};
   XSPI_AutoPollingTypeDef sConfig = {0};
   uint8_t reg;
