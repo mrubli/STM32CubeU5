@@ -274,9 +274,15 @@ void ext_flash_test_memory_mapped(bool read, bool write, bool verify, bool dtr)
   if (write)
   {
     DBG_PRINT("writing memory-mapped ...");
+#if 1
     uint8_t *mem = (uint8_t *)(ext_flash_start);
     for (int i = 0; i < 256; i++)
       *mem++ = (uint8_t)i;
+#else
+    uint64_t *mem = (uint64_t *)(ext_flash_start);
+    for (int i = 0; i < 256 / 8; i++)
+      *mem++ = 0xdeadbabecafe0000 + i;
+#endif
 
     HAL_Delay(MEMORY_PAGE_PROG_DELAY);
     DBG_PRINT("done writing memory-mapped");
@@ -428,7 +434,7 @@ int main(void)
     Error_Handler();
   }
 
-  const bool Dtr = true;
+  const bool Dtr = !true;
 
   /* Configure the memory in octal mode ------------------------------------- */
   OSPI_OctalModeCfg(&OSPIHandle, Dtr);
@@ -600,6 +606,7 @@ HAL_StatusTypeDef OSPIClock_Config(void)
 static void OSPI_WriteEnable(XSPI_HandleTypeDef *hospi, bool dtr)
 {
   const bool opi = false; // tentatively always use SPI (see AN5050)
+  dtr = false;  // TODO necessary?
 
   XSPI_RegularCmdTypeDef  sCommand = {0};
   XSPI_AutoPollingTypeDef sConfig = {0};
