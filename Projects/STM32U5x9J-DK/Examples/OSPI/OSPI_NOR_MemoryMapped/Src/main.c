@@ -139,7 +139,8 @@ static HAL_StatusTypeDef XSPI_NOR_Erase_Block(XSPI_HandleTypeDef *hxspi, uint32_
   }
 
   /* Configure automatic polling mode to wait for end of erase ------ */
-  OSPI_AutoPollingMemReady(&OSPIHandle, true, dtr);
+  // DTR doesn't work
+  OSPI_AutoPollingMemReady(&OSPIHandle, true, false);
 
   return HAL_OK;
 }
@@ -427,7 +428,7 @@ int main(void)
     Error_Handler();
   }
 
-  const bool Dtr = !true;
+  const bool Dtr = true;
 
   /* Configure the memory in octal mode ------------------------------------- */
   OSPI_OctalModeCfg(&OSPIHandle, Dtr);
@@ -599,7 +600,6 @@ HAL_StatusTypeDef OSPIClock_Config(void)
 static void OSPI_WriteEnable(XSPI_HandleTypeDef *hospi, bool dtr)
 {
   const bool opi = false; // tentatively always use SPI (see AN5050)
-  dtr = false; // TODO NEXT hangs in HAL_XSPI_AutoPolling, false doesn't help
 
   XSPI_RegularCmdTypeDef  sCommand = {0};
   XSPI_AutoPollingTypeDef sConfig = {0};
@@ -664,8 +664,6 @@ static void OSPI_WriteEnable(XSPI_HandleTypeDef *hospi, bool dtr)
   */
 static void OSPI_AutoPollingMemReady(XSPI_HandleTypeDef *hospi, bool opi, bool dtr)
 {
-  dtr = false; // TODO TEMP but prevents hang in dtr mode!
-
   XSPI_RegularCmdTypeDef  sCommand = {0};
   XSPI_AutoPollingTypeDef sConfig = {0};
 
@@ -866,7 +864,9 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi, bool dtr)
   }
 
   /* Wait that the memory is ready ---------------------------------- */
-  OSPI_AutoPollingMemReady(hospi, true, dtr);
+  printf("AAA");
+  // This doesn't work with DTR
+  OSPI_AutoPollingMemReady(hospi, true, false);
 }
 
 /**
