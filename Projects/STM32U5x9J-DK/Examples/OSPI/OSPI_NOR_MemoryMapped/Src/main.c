@@ -864,7 +864,6 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi, bool dtr)
   }
 
   /* Wait that the memory is ready ---------------------------------- */
-  printf("AAA");
   // This doesn't work with DTR
   OSPI_AutoPollingMemReady(hospi, true, false);
 }
