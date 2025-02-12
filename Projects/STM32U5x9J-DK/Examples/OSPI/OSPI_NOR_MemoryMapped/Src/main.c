@@ -606,7 +606,6 @@ HAL_StatusTypeDef OSPIClock_Config(void)
 static void OSPI_WriteEnable(XSPI_HandleTypeDef *hospi, bool dtr)
 {
   const bool opi = true; // AN5050 always uses SPI but using SPI breaks erase in our case (it silently doesn't erase)
-  dtr = false;  // TODO necessary?
 
   XSPI_RegularCmdTypeDef  sCommand = {0};
   XSPI_AutoPollingTypeDef sConfig = {0};
