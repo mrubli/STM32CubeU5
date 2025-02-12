@@ -682,7 +682,7 @@ static void OSPI_AutoPollingMemReady(XSPI_HandleTypeDef *hospi, bool opi, bool d
   sCommand.AlternateBytesMode = HAL_XSPI_ALT_BYTES_NONE;
   sCommand.DataMode           = opi ? HAL_XSPI_DATA_8_LINES : HAL_XSPI_DATA_1_LINE;
   sCommand.DataDTRMode        = dtr ? HAL_XSPI_DATA_DTR_ENABLE : HAL_XSPI_DATA_DTR_DISABLE; // TODO MX25 spec suggests this should always be false
-  sCommand.DataLength         = dtr ? 2 : 1; // TODO why can this be 1 in SDR mode?!
+  sCommand.DataLength         = dtr ? 2 : 1; // SR is 8 bits but may appear twice on the bus due to dummy cycles. Unclear why this would be 2 in OPI mode but AN5050 also has it this way.
   sCommand.DummyCycles        = opi ? (dtr ? DUMMY_CLOCK_CYCLES_READ_REG_DTR : DUMMY_CLOCK_CYCLES_READ_REG) : 0;
   sCommand.DQSMode            = dtr ? HAL_XSPI_DQS_ENABLE : HAL_XSPI_DQS_DISABLE;
   sCommand.SIOOMode           = HAL_XSPI_SIOO_INST_EVERY_CMD;
@@ -855,11 +855,14 @@ static void OSPI_OctalModeCfg(XSPI_HandleTypeDef *hospi, bool dtr)
   /* Wait that the configuration is effective and check that memory is ready */
   HAL_Delay(MEMORY_REG_WRITE_DELAY);
 
-  OSPIHandle.Init.MemoryType                = HAL_XSPI_MEMTYPE_MACRONIX;
-  OSPIHandle.Init.DelayHoldQuarterCycle     = HAL_XSPI_DHQC_ENABLE;
-  if (HAL_XSPI_Init(&OSPIHandle) != HAL_OK)
+  if (dtr)
   {
-    Error_Handler();
+    OSPIHandle.Init.MemoryType                = HAL_XSPI_MEMTYPE_MACRONIX;
+    OSPIHandle.Init.DelayHoldQuarterCycle     = HAL_XSPI_DHQC_ENABLE;
+    if (HAL_XSPI_Init(&OSPIHandle) != HAL_OK)
+    {
+      Error_Handler();
+    }
   }
 
   /* Wait that the memory is ready ---------------------------------- */
